@@ -248,9 +248,19 @@ public partial class Form1 : Form
 
     private void BtnConfigMsfs_Click(object sender, EventArgs e)
     {
+        // Show a warning before the folder picker so users know what to look for
+        MessageBox.Show(
+            "IMPORTANT: Select your MSFS CACHE folder, NOT your Community folder!\n\n" +
+            "The cache folder is typically named \"cache\" or \"shadercache\" and is located inside " +
+            "your MSFS packages directory.\n\n" +
+            "DO NOT select your Community folder — all files in the selected folder will be deleted during cleanup.",
+            "WARNING — Read Before Selecting",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Warning);
+
         using var dialog = new FolderBrowserDialog
         {
-            Description = "Select the MSFS cache folder",
+            Description = "Select the MSFS CACHE folder (NOT the Community folder!)",
             UseDescriptionForTitle = true
         };
 
@@ -261,10 +271,56 @@ public partial class Form1 : Form
 
         if (dialog.ShowDialog() == DialogResult.OK)
         {
-            appSettings.MsfsCachePath = dialog.SelectedPath;
+            var selectedPath = dialog.SelectedPath;
+
+            if (IsCommunityFolder(selectedPath))
+            {
+                MessageBox.Show(
+                    "STOP! You have selected what appears to be the MSFS Community folder!\n\n" +
+                    "Cleaning this folder will DELETE all your addons, liveries, and mods.\n\n" +
+                    "This selection has been rejected. Please select the correct CACHE folder instead.",
+                    "INVALID SELECTION — Community Folder Detected",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+                return;
+            }
+
+            appSettings.MsfsCachePath = selectedPath;
             appSettings.Save();
             ScanCaches();
         }
+    }
+
+    private bool IsCommunityFolder(string path)
+    {
+        var folderName = Path.GetFileName(path);
+
+        // Direct name match
+        if (string.Equals(folderName, "Community", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        // Check if it contains typical Community folder indicators (addon directories with layout.json/manifest.json)
+        try
+        {
+            var subdirs = Directory.GetDirectories(path);
+            int addonCount = 0;
+            foreach (var subdir in subdirs.Take(20)) // Check first 20 subdirectories
+            {
+                if (File.Exists(Path.Combine(subdir, "layout.json")) ||
+                    File.Exists(Path.Combine(subdir, "manifest.json")))
+                {
+                    addonCount++;
+                }
+                if (addonCount >= 2)
+                    return true;
+            }
+        }
+        catch
+        {
+            // If we can't read the directory, just rely on the name check
+        }
+
+        return false;
     }
 
     private void BtnClearLog_Click(object sender, EventArgs e)
