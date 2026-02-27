@@ -3,6 +3,7 @@
 A native Windows application to clean NVIDIA, AMD, and DirectX shader caches, as well as Microsoft Flight Simulator cache data.
 
 ![Screenshot](assets/screen.png)
+![Screenshot 2](assets/screen2.png)
 
 > **Disclaimer:** This software is provided "as is", without warranty of any kind. Use it at your own risk. The author is not responsible for any data loss, system issues, or other damages that may result from using this application. Always ensure important data is backed up before performing any cleanup operations.
 
