@@ -1,4 +1,4 @@
-# MSFS Shader Cache Cleaner
+# ClearSkies
 
 A native Windows application to clean NVIDIA, AMD, and DirectX shader caches, as well as Microsoft Flight Simulator cache data.
 
@@ -40,7 +40,7 @@ A native Windows application to clean NVIDIA, AMD, and DirectX shader caches, as
 
 1. Download the latest release
 2. Extract to a folder of your choice
-3. Run `ShaderCacheCleaner.exe`
+3. Run `ClearSkies.exe`
 
 ## Usage
 
@@ -74,7 +74,7 @@ A native Windows application to clean NVIDIA, AMD, and DirectX shader caches, as
 The application supports silent cleaning via command line:
 
 ```bash
-ShaderCacheCleaner.exe /clean
+ClearSkies.exe /clean
 ```
 
 This is used by the Task Scheduler for automatic cleaning.
@@ -100,7 +100,7 @@ Games will automatically rebuild shader caches as needed, so it's safe to delete
 ### Build
 
 ```bash
-cd ShaderCacheCleaner
+cd ClearSkies
 dotnet build
 ```
 

@@ -17,8 +17,8 @@
 
     <!-- Application settings -->
     <ApplicationIcon>app.ico</ApplicationIcon>
-    <Version>1.0.2</Version>
-    <AssemblyName>ShaderCacheCleaner</AssemblyName>
+    <Version>1.0.0</Version>
+    <AssemblyName>ClearSkies</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>

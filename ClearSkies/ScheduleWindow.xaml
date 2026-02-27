@@ -1,4 +1,4 @@
-<Window x:Class="ShaderCacheCleaner.ScheduleWindow"
+<Window x:Class="ClearSkies.ScheduleWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Schedule Automatic Cleaning"
@@ -111,6 +111,13 @@
                                          Foreground="{StaticResource TextBrush}"
                                          BorderBrush="{StaticResource PanelBorderBrush}"
                                          Padding="4" MaxLength="2" />
+                                <ComboBox x:Name="cmbAmPm" IsEditable="False"
+                                          Width="65" Margin="8,0,0,0"
+                                          Background="{StaticResource ButtonBgBrush}"
+                                          Foreground="Black" FontSize="13">
+                                    <ComboBoxItem Content="AM" IsSelected="True" />
+                                    <ComboBoxItem Content="PM" />
+                                </ComboBox>
                             </StackPanel>
 
                             <Button x:Name="btnApply" Content="Apply"
@@ -122,7 +129,7 @@
                     </Border>
 
                     <!-- Info text -->
-                    <TextBlock Text="Note: Creating scheduled tasks requires administrator privileges. The scheduler will automatically clean all existing caches at the specified time."
+                    <TextBlock Text="Note: Requires administrator privileges."
                                Foreground="{StaticResource SubtextBrush}" FontSize="11"
                                TextWrapping="Wrap" Margin="0,16,0,0" />
 

@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 
-namespace ShaderCacheCleaner
+namespace ClearSkies
 {
     public class CacheInfo
     {

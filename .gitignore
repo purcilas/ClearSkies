@@ -25,3 +25,9 @@ x86/
 
 ## Settings file (contains user-specific paths)
 settings.json
+
+## Build output
+publish/
+
+## IDE/Tool config
+.claude/

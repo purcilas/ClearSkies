@@ -1,6 +1,6 @@
 using System.Windows;
 
-namespace ShaderCacheCleaner;
+namespace ClearSkies;
 
 static class Program
 {

@@ -1,7 +1,7 @@
-<Window x:Class="ShaderCacheCleaner.MainWindow"
+<Window x:Class="ClearSkies.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="MSFS Shader Cache Cleaner"
+        Title="ClearSkies"
         Width="620" Height="760"
         MinWidth="520" MinHeight="600"
         WindowStartupLocation="CenterScreen"
@@ -30,7 +30,7 @@
                         <TextBlock Text="&#xE74E;" FontFamily="Segoe MDL2 Assets" FontSize="14"
                                    Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center"
                                    Margin="0,0,8,0" />
-                        <TextBlock Text="MSFS Shader Cache Cleaner"
+                        <TextBlock Text="ClearSkies"
                                    Foreground="{StaticResource SubtextBrush}"
                                    FontSize="12" VerticalAlignment="Center" />
                         <TextBlock x:Name="lblVersion"

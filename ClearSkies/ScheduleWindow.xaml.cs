@@ -3,11 +3,11 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 
-namespace ShaderCacheCleaner;
+namespace ClearSkies;
 
 public partial class ScheduleWindow : Window
 {
-    private const string TASK_NAME = "ShaderCacheCleanup";
+    private const string TASK_NAME = "ClearSkiesCleanup";
 
     public ScheduleWindow()
     {
@@ -17,7 +17,7 @@ public partial class ScheduleWindow : Window
 
     private void PopulateDayOfMonth()
     {
-        for (int i = 1; i <= 28; i++)
+        for (int i = 1; i <= 31; i++)
         {
             var item = new ComboBoxItem { Content = i.ToString() };
             if (i == 1) item.IsSelected = true;
@@ -142,12 +142,17 @@ public partial class ScheduleWindow : Window
             var frequency = selectedItem?.Content?.ToString() ?? "Daily";
             var schtasksFrequency = frequency.ToUpper();
 
-            // Parse time from text boxes
-            if (!int.TryParse(txtHour.Text, out int hour) || hour < 0 || hour > 23)
+            // Parse time from text boxes (12-hour format)
+            if (!int.TryParse(txtHour.Text, out int hour) || hour < 1 || hour > 12)
                 hour = 3;
             if (!int.TryParse(txtMinute.Text, out int minute) || minute < 0 || minute > 59)
                 minute = 0;
-            var time = $"{hour:D2}:{minute:D2}";
+            var isPm = (cmbAmPm.SelectedItem as ComboBoxItem)?.Content?.ToString() == "PM";
+            // Convert to 24-hour for schtasks
+            int hour24 = hour;
+            if (isPm && hour != 12) hour24 += 12;
+            if (!isPm && hour == 12) hour24 = 0;
+            var time = $"{hour24:D2}:{minute:D2}";
 
             var arguments = $"/Create /TN \"{TASK_NAME}\" /TR \"\\\"{exePath}\\\" /clean\" " +
                            $"/SC {schtasksFrequency} /ST {time} /F";
@@ -198,9 +203,10 @@ public partial class ScheduleWindow : Window
                     _ => "daily"
                 };
 
+                var amPm = isPm ? "PM" : "AM";
                 MessageBox.Show(
                     $"Scheduled task created successfully!\n\n" +
-                    $"The cache cleaner will run {summary} at {time}.",
+                    $"The cache cleaner will run {summary} at {hour}:{minute:D2} {amPm}.",
                     "Success",
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);

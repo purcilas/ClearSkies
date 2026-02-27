@@ -5,7 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 
 
-namespace ShaderCacheCleaner;
+namespace ClearSkies;
 
 public partial class MainWindow : Window
 {
@@ -102,13 +102,10 @@ public partial class MainWindow : Window
                 AddCacheCard(cache);
         }
 
-        if (msfsCaches.Count > 0)
-        {
-            AddSectionHeader("MSFS 2020/2024");
-            foreach (var cache in msfsCaches)
-                AddCacheCard(cache);
-            AddConfigButton();
-        }
+        AddSectionHeader("MSFS 2020/2024");
+        foreach (var cache in msfsCaches)
+            AddCacheCard(cache);
+        AddConfigButton();
 
         var totalSize = cacheManager.GetTotalCacheSize(currentCaches);
         var formattedSize = new CacheInfo { SizeInBytes = totalSize }.SizeFormatted;
