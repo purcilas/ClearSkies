@@ -212,7 +212,7 @@ partial class Form1
         MaximizeBox = false;
         Name = "Form1";
         StartPosition = FormStartPosition.CenterScreen;
-        Text = "Shader Cache Cleaner";
+        Text = "MSFS Shader Cache Cleaner";
         Load += Form1_Load;
         ResumeLayout(false);
         PerformLayout();
