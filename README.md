@@ -1,6 +1,8 @@
-# Shader Cache Cleaner
+# MSFS Shader Cache Cleaner
 
-A native Windows application to clean NVIDIA and DirectX shader caches, perfect for preparing your system for games like Microsoft Flight Simulator 2024.
+A native Windows application to clean NVIDIA, AMD, and DirectX shader caches, as well as Microsoft Flight Simulator cache data.
+
+> **Disclaimer:** This software is provided "as is", without warranty of any kind. Use it at your own risk. The author is not responsible for any data loss, system issues, or other damages that may result from using this application. Always ensure important data is backed up before performing any cleanup operations.
 
 ## Features
 
@@ -10,6 +12,7 @@ A native Windows application to clean NVIDIA and DirectX shader caches, perfect 
   - NVIDIA GPU Cache
   - DirectX Shader Cache (D3DSCache)
   - AMD Shader Caches (DX11 & DX12)
+  - Microsoft Flight Simulator cache data (configurable folder)
 
 - **Cache Size Display**: Shows the size of each cache before cleaning
 
@@ -20,19 +23,16 @@ A native Windows application to clean NVIDIA and DirectX shader caches, perfect 
   - Track skipped files (locked/in-use)
   - View summary statistics
 
+- **Locked File Handling**: Files in use are automatically scheduled for deletion on the next system restart (requires Administrator)
+
 - **Automatic Scheduling**: Set up automatic cache cleaning using Windows Task Scheduler
   - Daily, Weekly, or Monthly schedules
   - Custom time selection
 
-- **Safe Cleaning**:
-  - Files in use by applications are automatically skipped
-  - No data loss - only shader cache files are removed
-
 ## Requirements
 
 - Windows 10/11
-- .NET 8.0 Runtime
-- Administrator privileges (for some caches and scheduling)
+- Administrator privileges recommended (for locked file handling and scheduling)
 
 ## Installation
 
@@ -50,7 +50,12 @@ A native Windows application to clean NVIDIA and DirectX shader caches, perfect 
 4. Click **"Clean Selected"** to remove the cached files
 5. Confirm the deletion when prompted
 6. Watch the live log at the bottom to see which files are being deleted in real-time
-7. Use **"Clear Log"** to clear the deletion log
+
+### MSFS Cache
+
+1. Click **"MSFS Cache Folder"** to set the location of your MSFS cache directory
+2. The folder is saved and remembered between sessions
+3. MSFS cache will appear in the list alongside other shader caches
 
 ### Scheduled Cleaning
 
@@ -60,7 +65,7 @@ A native Windows application to clean NVIDIA and DirectX shader caches, perfect 
 4. Set the time for automatic cleaning
 5. Click **"Apply"**
 
-**Note**: Creating scheduled tasks requires Administrator privileges. Right-click the application and select "Run as Administrator" if needed.
+**Note**: Creating scheduled tasks requires Administrator privileges.
 
 ### Command Line
 
@@ -79,7 +84,7 @@ Shader caches can accumulate over time and consume significant disk space. Clean
 - Free up disk space (often several GB)
 - Resolve graphics issues or corruption
 - Improve game performance in some cases
-- Prepare for major updates (like MSFS 2024)
+- Prepare for major game updates
 
 Games will automatically rebuild shader caches as needed, so it's safe to delete them.
 
@@ -90,46 +95,34 @@ Games will automatically rebuild shader caches as needed, so it's safe to delete
 - Visual Studio 2022 or later
 - .NET 8.0 SDK
 
-### Build Steps
+### Build
 
 ```bash
 cd ShaderCacheCleaner
 dotnet build
 ```
 
-Or open the solution in Visual Studio and build normally.
+### Publish (single-file exe)
 
-## Technical Details
-
-- Built with C# and Windows Forms
-- Uses .NET 8.0
-- Integrates with Windows Task Scheduler via `schtasks.exe`
-- Calculates directory sizes recursively
-- Handles in-use files gracefully
+```bash
+dotnet publish -c Release -r win-x64 --self-contained true
+```
 
 ## Troubleshooting
 
 **"Not running as Administrator" warning**:
-- Some caches (especially NVIDIA NV_Cache in ProgramData) require admin rights
+- Some caches require admin rights to access
 - Right-click the app and select "Run as Administrator"
 
-**Scheduled task creation fails**:
-- Ensure you're running as Administrator
-- Check Windows Event Viewer for Task Scheduler errors
-
 **Some files won't delete**:
-- This is normal - files in use by running applications are skipped
-- Close graphics-intensive applications before cleaning
-- Some system files may be locked by Windows
+- Files in use by running applications are skipped
+- When running as Administrator, locked files are scheduled for deletion on reboot
+- Close graphics-intensive applications before cleaning for best results
 
 ## License
 
-This project is open source and free to use.
+This project is licensed under the [MIT License](LICENSE).
 
 ## Author
 
-Created for cleaning shader caches before MSFS 2024 installations.
-
-## Version
-
-1.0.0 - Initial Release
+purcilas
