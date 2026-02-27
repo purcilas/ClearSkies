@@ -208,6 +208,7 @@ partial class Form1
         Controls.Add(btnScan);
         Controls.Add(listViewCaches);
         FormBorderStyle = FormBorderStyle.FixedSingle;
+        Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
         MaximizeBox = false;
         Name = "Form1";
         StartPosition = FormStartPosition.CenterScreen;
