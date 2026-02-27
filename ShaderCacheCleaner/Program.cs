@@ -1,25 +1,28 @@
+using System.Windows;
+
 namespace ShaderCacheCleaner;
 
 static class Program
 {
-    /// <summary>
-    ///  The main entry point for the application.
-    /// </summary>
     [STAThread]
     static void Main(string[] args)
     {
-        // Check for command-line arguments
         if (args.Length > 0 && args[0].ToLower() == "/clean")
         {
-            // Run automatic cleaning without UI
             RunAutomaticClean();
             return;
         }
 
-        // To customize application configuration such as set high DPI settings or default font,
-        // see https://aka.ms/applicationconfiguration.
-        ApplicationConfiguration.Initialize();
-        Application.Run(new Form1());
+        var app = new Application();
+
+        // Load theme resources
+        var theme = new ResourceDictionary
+        {
+            Source = new Uri("pack://application:,,,/Theme.xaml")
+        };
+        app.Resources.MergedDictionaries.Add(theme);
+
+        app.Run(new MainWindow());
     }
 
     private static void RunAutomaticClean()
@@ -36,7 +39,6 @@ static class Program
                 cacheManager.CleanCache(cache);
             }
 
-            // Log completion (optional - could write to event log)
             System.Diagnostics.Debug.WriteLine($"Automatic cache cleaning completed. Cleaned {existingCaches.Count} caches.");
         }
         catch (Exception ex)
