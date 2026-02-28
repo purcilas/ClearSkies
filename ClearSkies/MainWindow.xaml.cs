@@ -84,27 +84,21 @@ public partial class MainWindow : Window
         currentGrid = null;
         currentGridIndex = 0;
 
-        var systemCaches = new List<CacheInfo>();
-        var msfsCaches = new List<CacheInfo>();
+        // Group caches by category, preserving order
+        var groups = currentCaches
+            .GroupBy(c => c.Category)
+            .OrderBy(g => g.Key == "System & GPU" ? 0 : 1);
 
-        foreach (var cache in currentCaches)
+        foreach (var group in groups)
         {
-            if (cache.Name.Contains("MSFS") || cache.Name.Contains("StreamedPackages") || cache.Name.Contains("Content.xml"))
-                msfsCaches.Add(cache);
-            else
-                systemCaches.Add(cache);
-        }
-
-        if (systemCaches.Count > 0)
-        {
-            AddSectionHeader("System & GPU");
-            foreach (var cache in systemCaches)
+            AddSectionHeader(group.Key);
+            foreach (var cache in group)
                 AddCacheCard(cache);
         }
 
-        AddSectionHeader("MSFS 2020/2024");
-        foreach (var cache in msfsCaches)
-            AddCacheCard(cache);
+        // Always show MSFS config button (for manual override)
+        if (!currentCaches.Any(c => c.Category != "System & GPU"))
+            AddSectionHeader("MSFS");
         AddConfigButton();
 
         var totalSize = cacheManager.GetTotalCacheSize(currentCaches);

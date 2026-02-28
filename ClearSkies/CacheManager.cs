@@ -12,6 +12,8 @@ namespace ClearSkies
         public string Path { get; set; } = string.Empty;
         public long SizeInBytes { get; set; }
         public bool Exists { get; set; }
+        public string Category { get; set; } = "System & GPU";
+        public string? FilePattern { get; set; }
 
         public string SizeFormatted => FormatBytes(SizeInBytes);
 
@@ -47,11 +49,52 @@ namespace ClearSkies
 
         private readonly string userProfile;
         private readonly string programData;
+        private readonly string appData;
+        private readonly string localAppData;
+
+        private static readonly (string Label, string RelativePath)[] MsfsInstallPaths =
+        {
+            ("MSFS 2020", @"Microsoft Flight Simulator"),
+            ("MSFS 2024", @"Microsoft Flight Simulator 2024"),
+        };
+
+        private static readonly (string Label, string RelativePath)[] MsfsStorePaths =
+        {
+            ("MSFS 2020", @"Packages\Microsoft.FlightSimulator_8wekyb3d8bbwe\LocalCache"),
+            ("MSFS 2024", @"Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache"),
+        };
 
         public CacheManager()
         {
             userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+            appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        }
+
+        public List<(string Label, string BasePath)> DetectMsfsInstallations()
+        {
+            var installations = new List<(string Label, string BasePath)>();
+
+            // Check Steam paths (%AppData%\Microsoft Flight Simulator[\2024])
+            foreach (var (label, rel) in MsfsInstallPaths)
+            {
+                var basePath = Path.Combine(appData, rel);
+                if (File.Exists(Path.Combine(basePath, "UserCfg.opt")))
+                    installations.Add(($"{label}", basePath));
+            }
+
+            // Check MS Store paths (%LocalAppData%\Packages\...)
+            foreach (var (label, rel) in MsfsStorePaths)
+            {
+                var basePath = Path.Combine(localAppData, rel);
+                // Only add if not already found via Steam path (avoid duplicates for same version)
+                if (File.Exists(Path.Combine(basePath, "UserCfg.opt")) &&
+                    !installations.Any(i => i.Label == label))
+                    installations.Add(($"{label}", basePath));
+            }
+
+            return installations;
         }
 
         public List<CacheInfo> GetAllCaches(string? msfsCachePath = null)
@@ -81,30 +124,76 @@ namespace ClearSkies
             AddCache(caches, "AMD DX12 Shader Cache",
                 Path.Combine(userProfile, @"AppData\Local\AMD\DxcCache"));
 
-            // MSFS Cache (user-configured path)
+            // Auto-detect MSFS installations
+            var msfsInstalls = DetectMsfsInstallations();
+            foreach (var (label, basePath) in msfsInstalls)
+            {
+                // Rolling Cache — always show if MSFS is detected, only targets .ccc files
+                AddCache(caches, $"{label} Rolling Cache", basePath, label, "*.ccc");
+
+                // SceneryIndexes
+                var sceneryPath = Path.Combine(basePath, "SceneryIndexes");
+                AddCache(caches, $"{label} SceneryIndexes", sceneryPath, label);
+            }
+
+            // Manual MSFS cache path (fallback/override)
             if (!string.IsNullOrWhiteSpace(msfsCachePath))
             {
-                AddCache(caches, "MSFS Cache Data", msfsCachePath);
+                // Only add if not already covered by auto-detection
+                bool alreadyCovered = msfsInstalls.Any(i =>
+                    msfsCachePath.StartsWith(i.BasePath, StringComparison.OrdinalIgnoreCase));
+                if (!alreadyCovered)
+                    AddCache(caches, "MSFS Cache (Manual)", msfsCachePath, "MSFS (Manual)");
             }
 
             return caches;
         }
 
-        private void AddCache(List<CacheInfo> caches, string name, string path)
+        private bool HasCacheFiles(string path)
+        {
+            try
+            {
+                return Directory.Exists(path) &&
+                       Directory.EnumerateFiles(path, "*.ccc").Any();
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private void AddCache(List<CacheInfo> caches, string name, string path, string? category = null, string? filePattern = null)
         {
             var cache = new CacheInfo
             {
                 Name = name,
                 Path = path,
-                Exists = Directory.Exists(path)
+                Exists = Directory.Exists(path),
+                Category = category ?? "System & GPU",
+                FilePattern = filePattern
             };
 
             if (cache.Exists)
             {
-                cache.SizeInBytes = CalculateDirectorySize(path);
+                cache.SizeInBytes = filePattern != null
+                    ? CalculatePatternSize(path, filePattern)
+                    : CalculateDirectorySize(path);
             }
 
             caches.Add(cache);
+        }
+
+        private long CalculatePatternSize(string path, string pattern)
+        {
+            try
+            {
+                var dirInfo = new DirectoryInfo(path);
+                return dirInfo.EnumerateFiles(pattern).Sum(file => file.Length);
+            }
+            catch
+            {
+                return 0;
+            }
         }
 
         private long CalculateDirectorySize(string path)
@@ -137,8 +226,10 @@ namespace ClearSkies
 
                 logCallback?.Invoke($"[{cache.Name}] Starting cleanup...");
 
-                // Delete all files in the directory
-                foreach (var file in dirInfo.EnumerateFiles("*", SearchOption.AllDirectories))
+                // Delete files (filtered by pattern if set, otherwise all files recursively)
+                var searchPattern = cache.FilePattern ?? "*";
+                var searchOption = cache.FilePattern != null ? SearchOption.TopDirectoryOnly : SearchOption.AllDirectories;
+                foreach (var file in dirInfo.EnumerateFiles(searchPattern, searchOption))
                 {
                     var relativePath = file.FullName.Replace(cache.Path, "").TrimStart('\\');
                     try
@@ -163,21 +254,24 @@ namespace ClearSkies
                     }
                 }
 
-                // Delete empty directories
-                foreach (var dir in dirInfo.EnumerateDirectories("*", SearchOption.AllDirectories).OrderByDescending(d => d.FullName.Length))
+                // Delete empty directories (skip when using file pattern to avoid touching parent dir)
+                if (cache.FilePattern == null)
                 {
-                    try
+                    foreach (var dir in dirInfo.EnumerateDirectories("*", SearchOption.AllDirectories).OrderByDescending(d => d.FullName.Length))
                     {
-                        if (!dir.EnumerateFileSystemInfos().Any())
+                        try
                         {
-                            var relativePath = dir.FullName.Replace(cache.Path, "").TrimStart('\\');
-                            dir.Delete();
-                            logCallback?.Invoke($"  ✓ Removed directory: {relativePath}");
+                            if (!dir.EnumerateFileSystemInfos().Any())
+                            {
+                                var relativePath = dir.FullName.Replace(cache.Path, "").TrimStart('\\');
+                                dir.Delete();
+                                logCallback?.Invoke($"  ✓ Removed directory: {relativePath}");
+                            }
                         }
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Could not delete directory {dir.Name}: {ex.Message}");
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Could not delete directory {dir.Name}: {ex.Message}");
+                        }
                     }
                 }
 

@@ -108,7 +108,7 @@
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="&#xE74D;" FontFamily="Segoe MDL2 Assets"
                                        FontSize="14" VerticalAlignment="Center" Margin="0,0,8,0" />
-                            <TextBlock Text="Run Selected" FontSize="14" FontWeight="SemiBold"
+                            <TextBlock Text="Clear the Skies!" FontSize="14" FontWeight="SemiBold"
                                        VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
