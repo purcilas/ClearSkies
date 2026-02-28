@@ -15,7 +15,11 @@ A native Windows application to clean NVIDIA, AMD, and DirectX shader caches, as
   - NVIDIA GPU Cache
   - DirectX Shader Cache (D3DSCache)
   - AMD Shader Caches (DX11 & DX12)
-  - Microsoft Flight Simulator cache data (configurable folder)
+
+- **MSFS Auto-Detection**: Automatically detects MSFS 2020 and 2024 installations (Steam and MS Store)
+  - Rolling Cache (.ccc files) cleanup
+  - SceneryIndexes cleanup (fixes missing scenery and reduces load times)
+  - Manual folder picker available as fallback
 
 - **Cache Size Display**: Shows the size of each cache before cleaning
 
@@ -48,17 +52,19 @@ A native Windows application to clean NVIDIA, AMD, and DirectX shader caches, as
 ### Manual Cleaning
 
 1. Launch the application
-2. Click **"Scan Caches"** to detect all shader caches
+2. Caches are automatically scanned on launch
 3. Select the caches you want to clean (or use **All**/**None** buttons)
-4. Click **"Clean Selected"** to remove the cached files
+4. Click **"Clear the Skies!"** to remove the cached files
 5. Confirm the deletion when prompted
 6. Watch the live log at the bottom to see which files are being deleted in real-time
 
 ### MSFS Cache
 
-1. Click **"MSFS Cache Folder"** to set the location of your MSFS cache directory
-2. The folder is saved and remembered between sessions
-3. MSFS cache will appear in the list alongside other shader caches
+MSFS 2020 and 2024 installations are **automatically detected** (both Steam and MS Store versions). The app will find and display:
+- **Rolling Cache** — large .ccc cache files
+- **SceneryIndexes** — scenery index data that can become corrupted
+
+If auto-detection doesn't find your installation, use **"Set Folder"** to manually select the MSFS cache directory.
 
 ### Scheduled Cleaning
 
