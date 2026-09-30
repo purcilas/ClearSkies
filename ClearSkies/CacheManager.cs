@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
 
 namespace ClearSkies
 {
@@ -42,10 +41,7 @@ namespace ClearSkies
 
     public class CacheManager
     {
-        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-        private static extern bool MoveFileEx(string lpExistingFileName, string? lpNewFileName, int dwFlags);
-
-        private const int MOVEFILE_DELAY_UNTIL_REBOOT = 0x4;
+        private readonly Dictionary<CacheInfo, (string Path, string? Pattern)> approvedTargets = new();
 
         private readonly string userProfile;
         private readonly string programData;
@@ -128,8 +124,8 @@ namespace ClearSkies
             var msfsInstalls = DetectMsfsInstallations();
             foreach (var (label, basePath) in msfsInstalls)
             {
-                // Rolling Cache — always show if MSFS is detected, only targets .ccc files
-                AddCache(caches, $"{label} Rolling Cache", basePath, label, "*.ccc");
+                // Never include manual caches or unrelated .ccc files.
+                AddCache(caches, $"{label} Rolling Cache", basePath, label, "ROLLINGCACHE.CCC");
 
                 // SceneryIndexes
                 var sceneryPath = Path.Combine(basePath, "SceneryIndexes");
@@ -139,27 +135,58 @@ namespace ClearSkies
             // Manual MSFS cache path (fallback/override)
             if (!string.IsNullOrWhiteSpace(msfsCachePath))
             {
-                // Only add if not already covered by auto-detection
-                bool alreadyCovered = msfsInstalls.Any(i =>
-                    msfsCachePath.StartsWith(i.BasePath, StringComparison.OrdinalIgnoreCase));
-                if (!alreadyCovered)
-                    AddCache(caches, "MSFS Cache (Manual)", msfsCachePath, "MSFS (Manual)");
+                if (TryResolveRollingCacheFolder(msfsCachePath, out var resolvedPath, out _) &&
+                    !caches.Any(c => string.Equals(c.Path, resolvedPath, StringComparison.OrdinalIgnoreCase) &&
+                                     c.FilePattern == "ROLLINGCACHE.CCC"))
+                    AddCache(caches, "MSFS Rolling Cache (Manual)", resolvedPath, "MSFS (Manual)", "ROLLINGCACHE.CCC");
             }
 
             return caches;
         }
 
-        private bool HasCacheFiles(string path)
+        public bool TryResolveRollingCacheFolder(string path, out string resolvedPath, out string error)
         {
+            resolvedPath = string.Empty;
+            error = "Select a folder containing ROLLINGCACHE.CCC, or an MSFS package folder whose LocalCache contains it. No other files will be cleaned.";
             try
             {
-                return Directory.Exists(path) &&
-                       Directory.EnumerateFiles(path, "*.ccc").Any();
+                if (!Path.IsPathFullyQualified(path)) return false;
+                var fullPath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
+                foreach (var candidate in new[] { fullPath, Path.Combine(fullPath, "LocalCache") })
+                {
+                    var file = Path.Combine(candidate, "ROLLINGCACHE.CCC");
+                    if (Directory.Exists(candidate) && File.Exists(file) && !HasReparsePoint(file))
+                    {
+                        resolvedPath = candidate;
+                        error = string.Empty;
+                        return true;
+                    }
+                }
+                return false;
             }
             catch
             {
                 return false;
             }
+        }
+
+        private static bool HasReparsePoint(string path)
+        {
+            for (string? current = Path.GetFullPath(path); current != null; current = Path.GetDirectoryName(current))
+                if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0) return true;
+            return false;
+        }
+
+        private static IEnumerable<FileInfo> EnumerateCacheFiles(string path, string? pattern)
+        {
+            if (HasReparsePoint(path)) throw new IOException("Linked cache folders are not supported.");
+            return new DirectoryInfo(path).EnumerateFiles(pattern ?? "*", new EnumerationOptions
+            {
+                RecurseSubdirectories = pattern == null,
+                AttributesToSkip = FileAttributes.ReparsePoint,
+                IgnoreInaccessible = false,
+                MatchType = MatchType.Simple
+            });
         }
 
         private void AddCache(List<CacheInfo> caches, string name, string path, string? category = null, string? filePattern = null)
@@ -181,14 +208,14 @@ namespace ClearSkies
             }
 
             caches.Add(cache);
+            approvedTargets[cache] = (cache.Path, cache.FilePattern);
         }
 
         private long CalculatePatternSize(string path, string pattern)
         {
             try
             {
-                var dirInfo = new DirectoryInfo(path);
-                return dirInfo.EnumerateFiles(pattern).Sum(file => file.Length);
+                return EnumerateCacheFiles(path, pattern).Sum(file => file.Length);
             }
             catch
             {
@@ -200,8 +227,7 @@ namespace ClearSkies
         {
             try
             {
-                var dirInfo = new DirectoryInfo(path);
-                return dirInfo.EnumerateFiles("*", SearchOption.AllDirectories)
+                return EnumerateCacheFiles(path, null)
                     .Sum(file => file.Length);
             }
             catch
@@ -214,6 +240,14 @@ namespace ClearSkies
         {
             var result = new CleanResult();
 
+            if (!approvedTargets.TryGetValue(cache, out var target) ||
+                cache.Path != target.Path || cache.FilePattern != target.Pattern)
+            {
+                result.Error = "Cleanup rejected: target was not safely identified by the cache scanner.";
+                logCallback?.Invoke(result.Error);
+                return result;
+            }
+
             if (!cache.Exists)
             {
                 result.Error = "Cache directory does not exist.";
@@ -222,56 +256,23 @@ namespace ClearSkies
 
             try
             {
-                var dirInfo = new DirectoryInfo(cache.Path);
-
                 logCallback?.Invoke($"[{cache.Name}] Starting cleanup...");
 
                 // Delete files (filtered by pattern if set, otherwise all files recursively)
-                var searchPattern = cache.FilePattern ?? "*";
-                var searchOption = cache.FilePattern != null ? SearchOption.TopDirectoryOnly : SearchOption.AllDirectories;
-                foreach (var file in dirInfo.EnumerateFiles(searchPattern, searchOption))
+                foreach (var file in EnumerateCacheFiles(target.Path, target.Pattern))
                 {
                     var relativePath = file.FullName.Replace(cache.Path, "").TrimStart('\\');
                     try
                     {
+                        if (HasReparsePoint(file.FullName)) throw new IOException("Linked files are not supported.");
                         file.Delete();
                         result.DeletedFiles++;
                         logCallback?.Invoke($"  ✓ Deleted: {relativePath}");
                     }
                     catch
                     {
-                        // File is locked — schedule deletion on next reboot
-                        if (MoveFileEx(file.FullName, null, MOVEFILE_DELAY_UNTIL_REBOOT))
-                        {
-                            result.PendingRebootFiles++;
-                            logCallback?.Invoke($"  ⏳ Pending reboot: {relativePath}");
-                        }
-                        else
-                        {
-                            result.SkippedFiles++;
-                            logCallback?.Invoke($"  ✗ Skipped: {relativePath} (file is locked)");
-                        }
-                    }
-                }
-
-                // Delete empty directories (skip when using file pattern to avoid touching parent dir)
-                if (cache.FilePattern == null)
-                {
-                    foreach (var dir in dirInfo.EnumerateDirectories("*", SearchOption.AllDirectories).OrderByDescending(d => d.FullName.Length))
-                    {
-                        try
-                        {
-                            if (!dir.EnumerateFileSystemInfos().Any())
-                            {
-                                var relativePath = dir.FullName.Replace(cache.Path, "").TrimStart('\\');
-                                dir.Delete();
-                                logCallback?.Invoke($"  ✓ Removed directory: {relativePath}");
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"Could not delete directory {dir.Name}: {ex.Message}");
-                        }
+                        result.SkippedFiles++;
+                        logCallback?.Invoke($"  Skipped: {relativePath} (locked, inaccessible, or linked)");
                     }
                 }
 

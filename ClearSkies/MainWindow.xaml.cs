@@ -25,6 +25,12 @@ public partial class MainWindow : Window
         cacheManager = new CacheManager();
         currentCaches = new List<CacheInfo>();
         appSettings = AppSettings.Load();
+        if (!string.IsNullOrWhiteSpace(appSettings.MsfsCachePath) &&
+            !cacheManager.TryResolveRollingCacheFolder(appSettings.MsfsCachePath, out _, out var savedPathError))
+        {
+            MessageBox.Show($"The saved manual cache folder will be ignored:\n{appSettings.MsfsCachePath}\n\n{savedPathError}",
+                "Manual cache folder needs attention", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
 
         var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
         lblVersion.Text = version != null ? $"v{version.Major}.{version.Minor}.{version.Build}" : "";
@@ -94,6 +100,8 @@ public partial class MainWindow : Window
             AddSectionHeader(group.Key);
             foreach (var cache in group)
                 AddCacheCard(cache);
+            if (group.Key == "System & GPU")
+                AddNvidiaAppHelp();
         }
 
         // Always show MSFS config button (for manual override)
@@ -153,7 +161,7 @@ public partial class MainWindow : Window
 
         var nameBlock = new TextBlock
         {
-            Text = cache.Name,
+            Text = $"{cache.Name}\n{cache.Path}",
             Foreground = cache.Exists
                 ? (SolidColorBrush)FindResource("TextBrush")
                 : (SolidColorBrush)FindResource("SubtextBrush"),
@@ -206,6 +214,72 @@ public partial class MainWindow : Window
         {
             pnlCheckboxes.Children.Add(card);
         }
+    }
+
+    private static string? FindNvidiaApp()
+    {
+        foreach (var folder in new[] { Environment.SpecialFolder.ProgramFiles, Environment.SpecialFolder.ProgramFilesX86 })
+        {
+            var programFiles = Environment.GetFolderPath(folder);
+            if (string.IsNullOrWhiteSpace(programFiles)) continue;
+            var executable = Path.Combine(programFiles, "NVIDIA Corporation", "NVIDIA app", "CEF", "NVIDIA App.exe");
+            if (File.Exists(executable)) return executable;
+        }
+        return null;
+    }
+
+    private void AddNvidiaAppHelp()
+    {
+        var button = new Button
+        {
+            Content = "NVIDIA DirectX cache: NVIDIA App instructions",
+            Style = (Style)FindResource("DarkButton"),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            FontSize = 11,
+            Padding = new Thickness(10, 6, 10, 6),
+            Margin = new Thickness(2, 6, 2, 2),
+            ToolTip = "Learn how to clear and rebuild shaders using NVIDIA App, and open it if installed."
+        };
+        button.Click += (_, _) => ShowNvidiaAppHelp();
+        pnlCheckboxes.Children.Add(button);
+    }
+
+    private void ShowNvidiaAppHelp()
+    {
+            var executable = FindNvidiaApp();
+            var instructions =
+                "Clear and rebuild the shader cache using NVIDIA App:\n\n" +
+                "1. Close MSFS and other games.\n" +
+                "2. Open NVIDIA App > Graphics > Global Settings.\n" +
+                "3. Open Shader Cache (called Shader Cache Size in some versions).\n" +
+                "4. Open the three-dot menu and select Clear cache.\n" +
+                "5. Confirm the cleanup and wait for it to finish.\n" +
+                "6. Enable Auto Shader Compilation (beta) if needed.\n" +
+                "7. Open the three-dot menu again and select Compile now to rebuild supported shaders.\n" +
+                "8. Wait for compilation to finish before launching MSFS or other games.\n\n" +
+                "If Clear cache or Compile now is missing, update NVIDIA App and your graphics driver, then check again. " +
+                "Availability depends on the installed version.\n\n" +
+                "NVIDIA clears most cache files. Compilation supports eligible DirectX 12 shaders; " +
+                "games may still need to compile additional shaders when played. " +
+                "ClearSkies does not invoke these actions automatically.\n\n" +
+                "If you use NVIDIA App instead, uncheck NVIDIA DirectX Shader Cache before cleaning in ClearSkies.\n\n";
+            if (executable == null)
+            {
+                MessageBox.Show(this, instructions + "NVIDIA App was not found in the standard installation folders. Open it from Start if installed elsewhere.",
+                    "NVIDIA shader cache cleanup", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            if (MessageBox.Show(this, instructions + "Open NVIDIA App now?", "NVIDIA shader cache cleanup",
+                MessageBoxButton.YesNo, MessageBoxImage.Information) != MessageBoxResult.Yes) return;
+            try
+            {
+                Process.Start(new ProcessStartInfo(executable) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, $"Could not open NVIDIA App. Open it from Start instead.\n\n{ex.Message}",
+                    "NVIDIA App", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
     }
 
     private void AddConfigButton()
@@ -278,9 +352,29 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (selectedCaches.Any(c => c.Name == "NVIDIA DirectX Shader Cache"))
+        {
+            var nvidiaChoice = MessageBox.Show(this,
+                "NVIDIA App offers an option to clear and rebuild supported shaders.\n\n" +
+                "Use Graphics > Global Settings > Shader Cache > three-dot menu > Clear cache, " +
+                "then Compile now. Wait for compilation to finish before launching your game.\n\n" +
+                "Yes: Show instructions and the option to open NVIDIA App. No cleanup will run.\n" +
+                "No: Continue to the ClearSkies cleanup confirmation.\n" +
+                "Cancel: Stop without cleaning.",
+                "NVIDIA shader cache alternative", MessageBoxButton.YesNoCancel,
+                MessageBoxImage.Information, MessageBoxResult.Cancel);
+            if (nvidiaChoice == MessageBoxResult.Yes)
+            {
+                ShowNvidiaAppHelp();
+                return;
+            }
+            if (nvidiaChoice != MessageBoxResult.No) return;
+        }
+
         var totalSize = new CacheInfo { SizeInBytes = selectedCaches.Sum(c => c.SizeInBytes) }.SizeFormatted;
         var result = MessageBox.Show(
             $"This will delete {selectedCaches.Count} cache(s) totaling {totalSize}.\n\n" +
+            string.Join("\n", selectedCaches.Select(c => $"{c.Path} — {c.FilePattern ?? "cache files in this folder and subfolders"}")) + "\n\n" +
             "Files currently in use by applications will be skipped.\n\n" +
             "Do you want to continue?",
             "Confirm Cleaning",
@@ -366,7 +460,7 @@ public partial class MainWindow : Window
         else
         {
             MessageBox.Show(
-                $"Successfully cleaned {cleaned} cache(s)!",
+                $"Cleaned {cleaned} cache(s). Skipped {totalSkipped} file(s).",
                 "Cleaning Complete",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
@@ -375,10 +469,8 @@ public partial class MainWindow : Window
         if (totalSkipped > 0 && !IsAdministrator())
         {
             MessageBox.Show(
-                $"{totalSkipped} file(s) were locked and could not be deleted or scheduled for removal.\n\n" +
-                "To handle locked files, right-click the app and select \"Run as administrator\". " +
-                "This allows the app to schedule locked files for deletion on the next restart.",
-                "Tip: Run as Administrator",
+                $"{totalSkipped} file(s) could not be deleted. Close applications using the caches and try again. No deletions were scheduled for restart.",
+                "Files skipped",
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
         }
@@ -419,17 +511,15 @@ public partial class MainWindow : Window
     private void BtnConfigMsfs_Click(object sender, RoutedEventArgs e)
     {
         MessageBox.Show(
-            "IMPORTANT: Select your MSFS CACHE folder, NOT your Community folder!\n\n" +
-            "The cache folder is typically named \"cache\" or \"shadercache\" and is located inside " +
-            "your MSFS packages directory.\n\n" +
-            "DO NOT select your Community folder - all files in the selected folder will be deleted during cleanup.",
-            "WARNING - Read Before Selecting",
+            "Select the folder containing ROLLINGCACHE.CCC. You can also select the MSFS package folder if its LocalCache contains that file.\n\n" +
+            "Manual cleanup deletes only ROLLINGCACHE.CCC. MSFS may recreate it at its default size; restore your preferred size in the simulator afterward.",
+            "Select rolling cache",
             MessageBoxButton.OK,
             MessageBoxImage.Warning);
 
         var dialog = new Microsoft.Win32.OpenFolderDialog
         {
-            Title = "Select the MSFS CACHE folder (NOT the Community folder!)"
+            Title = "Select folder containing ROLLINGCACHE.CCC"
         };
 
         if (!string.IsNullOrWhiteSpace(appSettings.MsfsCachePath) && Directory.Exists(appSettings.MsfsCachePath))
@@ -441,53 +531,15 @@ public partial class MainWindow : Window
         {
             var selectedPath = dialog.FolderName;
 
-            if (IsCommunityFolder(selectedPath))
+            if (!cacheManager.TryResolveRollingCacheFolder(selectedPath, out var resolvedPath, out var error))
             {
-                MessageBox.Show(
-                    "STOP! You have selected what appears to be the MSFS Community folder!\n\n" +
-                    "Cleaning this folder will DELETE all your addons, liveries, and mods.\n\n" +
-                    "This selection has been rejected. Please select the correct CACHE folder instead.",
-                    "INVALID SELECTION - Community Folder Detected",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
+                MessageBox.Show(error, "No rolling cache found", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-
-            appSettings.MsfsCachePath = selectedPath;
+            appSettings.MsfsCachePath = resolvedPath;
             appSettings.Save();
             ScanCaches();
         }
-    }
-
-    private bool IsCommunityFolder(string path)
-    {
-        var folderName = System.IO.Path.GetFileName(path);
-
-        if (string.Equals(folderName, "Community", StringComparison.OrdinalIgnoreCase))
-            return true;
-
-        try
-        {
-            var subdirs = Directory.GetDirectories(path);
-
-            foreach (var subdir in subdirs)
-            {
-                if (string.Equals(System.IO.Path.GetFileName(subdir), "Community", StringComparison.OrdinalIgnoreCase))
-                    return true;
-            }
-
-            foreach (var subdir in subdirs.Take(20))
-            {
-                if (File.Exists(System.IO.Path.Combine(subdir, "layout.json")) ||
-                    File.Exists(System.IO.Path.Combine(subdir, "manifest.json")))
-                    return true;
-            }
-        }
-        catch
-        {
-        }
-
-        return false;
     }
 
     private void BtnClearLog_Click(object sender, RoutedEventArgs e)
