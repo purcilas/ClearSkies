@@ -2,6 +2,10 @@
 
 A native Windows application to clean NVIDIA, AMD, and DirectX shader caches, as well as Microsoft Flight Simulator cache data.
 
+**Latest release: [v1.1.1](https://github.com/purcilas/ClearSkies/releases/tag/v1.1.1)** — [Download Windows x64 executable](https://github.com/purcilas/ClearSkies/releases/download/v1.1.1/ClearSkies.exe) · [Changelog](CHANGELOG.md)
+
+> **Important safety update:** Before v1.1.1, manually selecting a broad folder could cause unrelated files inside it to be deleted recursively. Update before using manual-folder cleanup. v1.1.1 restricts manual cleanup to `ROLLINGCACHE.CCC`, ignores invalid saved paths, and stops scheduling deletions after reboot. It does not cancel deletion requests already queued by older versions.
+
 ![Screenshot](assets/screen.png)
 ![Screenshot 2](assets/screen2.png)
 
@@ -40,13 +44,13 @@ A native Windows application to clean NVIDIA, AMD, and DirectX shader caches, as
 ## Requirements
 
 - Windows 10/11
-- Administrator privileges recommended (for locked file handling and scheduling)
+- Administrator privileges may be needed for protected cache folders and creating scheduled tasks. Locked files are skipped even when elevated.
 
 ## Installation
 
-1. Download the latest release
-2. Extract to a folder of your choice
-3. Run `ClearSkies.exe`
+1. Download [ClearSkies.exe](https://github.com/purcilas/ClearSkies/releases/download/v1.1.1/ClearSkies.exe).
+2. Save it in a folder of your choice. When upgrading, close ClearSkies and replace the previous executable.
+3. Run `ClearSkies.exe`. The Windows x64 download is self-contained; no separate .NET installation is required.
 
 ## Usage
 
@@ -79,6 +83,7 @@ ClearSkies opens NVIDIA App but does not automatically invoke its internal clean
 ### MSFS Cache
 
 MSFS 2020 and 2024 installations are **automatically detected** (both Steam and MS Store versions). The app will find and display:
+
 - **Rolling Cache** — only `ROLLINGCACHE.CCC`; manual caches are preserved
 - **SceneryIndexes** — scenery index data that can become corrupted
 
@@ -115,7 +120,7 @@ Shader caches can accumulate over time and consume significant disk space. Clean
 - Improve game performance in some cases
 - Prepare for major game updates
 
-Games will automatically rebuild shader caches as needed, so it's safe to delete them.
+Games rebuild shader caches as needed. The first runs after cleanup may stutter while shaders compile; routine deletion is not necessary when games are working normally.
 
 ## Building from Source
 
@@ -136,6 +141,16 @@ dotnet build
 ```bash
 dotnet publish -c Release -r win-x64 --self-contained true
 ```
+
+### Safety regression checks
+
+From the repository root, run:
+
+```powershell
+dotnet run --project tests/ClearSkies.SafetyTests.csproj
+```
+
+These checks use newly created temporary fixtures, never real simulator caches. They cover broad manual folders, preserved user files, modified cleanup targets, locked files, and directory junctions. Fixtures are retained at the path printed by the test runner.
 
 ## Troubleshooting
 
